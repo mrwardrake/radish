@@ -3,23 +3,19 @@
 <head>
 <link rel="manifest" href="manifest.json">
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
-<link rel="manifest" href="manifest.json">
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title>RADIOACTIVE SHRIMP</title>
 <script type="module">
-  // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, getDoc, setDoc, serverTimestamp }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──
+  // Firebase Console → Project Settings → Your Apps → Web App → SDK setup
+  const firebaseConfig = {
   apiKey: "AIzaSyBpkxV6VunQTSm3yT_FZfvlREOCYgIacCc",
   authDomain: "radioactive-shrimp.firebaseapp.com",
   projectId: "radioactive-shrimp",
@@ -28,10 +24,6 @@ const firebaseConfig = {
   appId: "1:364663379757:web:ffcbf1cdeeffa7c7f8a5a4",
   measurementId: "G-73X4THKBPV"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
   // ─────────────────────────────────────
 
   const app = initializeApp(firebaseConfig);
@@ -247,36 +239,7 @@ let playerName = localStorage.getItem('radShrimp_name') || '';
 let personalBest = parseInt(localStorage.getItem('radShrimp_pb') || '0');
 let fbReady = false;
 
-window.addEventListener('fbReady', () => {
-  fbReady = true;
-  // Reconcile local PB with Firestore — whichever is higher wins,
-  // and push the local PB up to Firestore if it's better (catches scores
-  // that were set before Firebase was configured)
-  if(playerName && window._db) {
-    const pbRef = window._doc(window._db, 'personal_bests', playerName);
-    window._getDoc(pbRef).then(snap => {
-      const remotePB = snap.exists() ? (snap.data().score || 0) : 0;
-      if(remotePB > personalBest) {
-        // Firestore has a better score — update local
-        personalBest = remotePB;
-        localStorage.setItem('radShrimp_pb', remotePB);
-        const pbEl = document.getElementById('pbVal');
-        if(pbEl) pbEl.textContent = personalBest.toLocaleString();
-      } else if(personalBest > remotePB && personalBest > 0) {
-        // Local has a better score — push it up to Firestore
-        window._setDoc(pbRef, {
-          name: playerName,
-          score: personalBest,
-          level: 0,
-          dateStr: 'Before leaderboard',
-          timestamp: window._serverTimestamp()
-        }).then(()=>{
-          console.log('Historic PB synced to Firestore:', personalBest);
-        }).catch(()=>{});
-      }
-    }).catch(()=>{});
-  }
-});
+window.addEventListener('fbReady', () => { fbReady = true; });
 
 // ── Show / hide screens ──
 function showNameScreen(onConfirm) {
@@ -373,11 +336,7 @@ async function loadLeaderboard(highlightScore=null) {
       const d = docSnap.data();
       const isYou = d.name === playerName && d.score === highlightScore;
       if(isYou) found = true;
-      let date = '—';
-      if(d.timestamp) {
-        try { date = new Date(d.timestamp.toDate()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e){}
-      }
-      if(date==='—' && d.dateStr) date = d.dateStr;
+      const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleDateString() : '—';
       const tr = document.createElement('tr');
       tr.className = isYou ? 'you' : (rank===1?'rank1':rank===2?'rank2':rank===3?'rank3':'');
       tr.innerHTML = `<td>${rank}</td><td>${d.name||'???'}</td><td>${(d.score||0).toLocaleString()}</td><td>${d.level||1}</td><td>${date}</td>`;
@@ -391,39 +350,27 @@ async function loadLeaderboard(highlightScore=null) {
 }
 
 async function submitScore(score, level) {
-  // Update personal best locally
+  // Update personal best
   if(score > personalBest) {
     personalBest = score;
     localStorage.setItem('radShrimp_pb', score);
   }
-  if(!fbReady || !window._db) {
-    console.warn('Score not submitted: Firebase not ready. fbReady='+fbReady+' _db='+(!!window._db));
-    return;
-  }
+  if(!fbReady || !window._db) return;
   try {
-    const now = new Date();
-    const docRef = await window._addDoc(window._collection(window._db,'scores'), {
+    // Add to global scores collection
+    await window._addDoc(window._collection(window._db,'scores'), {
       name: playerName || 'UNKNOWN',
       score, level,
-      timestamp: window._serverTimestamp(),
-      dateStr: now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+      timestamp: window._serverTimestamp()
     });
-    console.log('Score saved! Doc ID:', docRef.id);
-    // Update personal best doc
+    // Update personal best doc (keyed by name)
     const pbRef = window._doc(window._db, 'personal_bests', playerName || 'UNKNOWN');
     const pbSnap = await window._getDoc(pbRef);
     if(!pbSnap.exists() || pbSnap.data().score < score) {
       await window._setDoc(pbRef, { name: playerName, score, level, timestamp: window._serverTimestamp() });
-      console.log('Personal best updated in Firestore:', score);
     }
   } catch(e) {
-    console.error('Score submit FAILED:', e.code, e.message);
-    // Show error in leaderboard status so player can see it
-    const status = document.getElementById('lbStatus');
-    if(status) {
-      status.style.color='#f44';
-      status.textContent = '⚠ Score save failed: ' + (e.code || e.message);
-    }
+    console.warn('Score submit failed:', e.message);
   }
 }
 
@@ -614,7 +561,7 @@ function initState(){
     score:0, lives:3, level:1, lvlTimer:0,
     spawnTimer:0, spawnInt:170,
     weapon:'cannon', // permanent — only changes on powerup
-    laserRing:false, laserRingTimer:0, laserRingAngle:0,
+    laserRing:false, laserRingTimer:0, laserRingAngle:0, laserRingActive:false,
     mines:[], mineTimer:200,
     shootCD:0, laserOn:false, laserTimer:0,
     shakeT:0, shakeX:0, shakeY:0,
@@ -636,26 +583,20 @@ canvas.addEventListener('mouseup',()=>{keys['Space']=false;});
 function scaleCanvas(){
   const gc=document.getElementById('gc');
   const vw=window.innerWidth, vh=window.innerHeight;
-  const isMobile=vw<820; // only scale if screen is actually smaller than the game
+  const isMobile=vw<=900;
+  // On desktop (large screen), don't scale at all — just let flexbox center
   if(!isMobile){
-    // Desktop: clear any mobile styles, let flexbox center naturally
-    gc.style.cssText='';
-    document.body.style.justifyContent='center';
+    gc.style.transform='';
+    gc.style.margin='';
     return;
   }
-  // Mobile: scale to fit, account for touch controls at bottom
   const padBottom=164;
-  const scale=Math.min(vw/820,(vh-padBottom)/620,1);
-  const scaledW=820*scale;
-  const scaledH=620*scale;
-  // Use absolute positioning so transform doesn't affect document flow at all
-  gc.style.position='absolute';
-  gc.style.top=Math.max(0,(vh-padBottom-scaledH)/2)+'px';
-  gc.style.left=((vw-scaledW)/2)+'px';
+  const scale=Math.min(vw/820,(vh-padBottom)/620);
   gc.style.transform=`scale(${scale})`;
-  gc.style.transformOrigin='top left';
-  gc.style.margin='0';
-  document.body.style.justifyContent='flex-start';
+  // Negative margins cancel the phantom layout space CSS transform leaves
+  const shrinkW=(820-820*scale)/2;
+  const shrinkH=(620-620*scale)/2;
+  gc.style.margin=`${-shrinkH}px ${-shrinkW}px`;
 }
 scaleCanvas();
 window.addEventListener('resize',scaleCanvas);
@@ -907,9 +848,9 @@ function shoot(){
     S.laserOn=true; S.laserTimer=55; S.laserBeams=3;
     S.shootCD=70; sfxFire('laser');
   } else if(S.weapon==='laser_ring'){
-    // Activate spinning laser ring around sub for 3 seconds
-    S.laserRing=true; S.laserRingTimer=300; S.laserRingAngle=0;
-    S.shootCD=320; sfxFire('laser');
+    // laser_ring is a passive — fire cannon as fallback weapon
+    S.bullets.push({x:sub.x+sub.w,y:sub.y+sub.h/2,vx:14,vy:0,r:5.5,dmg:18,type:'cannon',life:85,trail:[]});
+    S.shootCD=13;
   } else if(S.weapon==='mega_bomb'){
     // Massive slow bomb lobbed forward — HUGE explosion
     S.bullets.push({x:cx,y:cy,vx:6,vy:rand(-0.6,0.6),r:18,dmg:350,type:'mega_bomb',exR:240,life:130,trail:[]});
@@ -961,7 +902,7 @@ function collectPU(pu){
     case 'homing_rocket': S.weapon='homing_rocket'; break;
     case 'multi_rocket':  S.weapon='multi_rocket';  break;
     case 'multi_laser':   S.weapon='multi_laser';   break;
-    case 'laser_ring':    S.weapon='laser_ring';    break;
+    case 'laser_ring':    S.laserRingActive=true; S.laserRingTimer=360; S.laserRingAngle=0; return; // timed passive — don't change weapon
     case 'mega_bomb':     S.weapon='mega_bomb';     break;
     case 'omni_homing':   S.weapon='omni_homing';   break;
     case 'hydra':         S.weapon='hydra';         break;
@@ -1017,39 +958,35 @@ function update(){
 
   // Laser continuous
   // Laser Ring — orbiting damage aura
-  if(S.laserRing){
+  if(S.laserRingActive){
     S.laserRingTimer--;
-    S.laserRingAngle+=0.055;
-    if(S.laserRingTimer<=0){ S.laserRing=false; }
+    if(S.laserRingTimer<=0){ S.laserRingActive=false; }
+    S.laserRingAngle+=0.04;
     const cx2=sub.x+sub.w/2, cy2=sub.y+sub.h/2;
-    // SHIELD_R matches the drawn bubble exactly (72px)
-    // DAMAGE_R is larger — enemies get zapped as they approach, not just on contact
-    const SHIELD_R=72;
-    const DAMAGE_R=110; // zap zone — enemies within this radius take burn damage
+    const ARC_R=80;   // radius of the spinning arcs
+    const DAMAGE_R=95; // damage zone — slightly larger than visual
 
-    // Burn enemies within damage radius every frame
+    // Burn enemies that enter the laser arc zone
     for(let i=S.enemies.length-1;i>=0;i--){
       const e=S.enemies[i];
       const d=Math.hypot(e.x-cx2, e.y-cy2);
       if(d < DAMAGE_R){
-        // Damage scales with proximity — closer = more burn
         const proximity=1-(d/DAMAGE_R);
-        e.hp -= (8 + S.level*0.3) * proximity;
-        // Spark at the shield surface
-        if(Math.random()<0.3){
+        e.hp -= (5 + S.level*0.2) * proximity;
+        if(Math.random()<0.25){
           const ang=Math.atan2(e.y-cy2, e.x-cx2);
-          spawnParts(cx2+Math.cos(ang)*SHIELD_R, cy2+Math.sin(ang)*SHIELD_R, '#0ff', 3, 2, 18);
+          spawnParts(cx2+Math.cos(ang)*ARC_R, cy2+Math.sin(ang)*ARC_R, '#0ff', 2, 2, 16);
         }
         if(e.hp<=0){ killEnemy(e); continue; }
-        // Push back if touching the bubble surface
-        if(d < SHIELD_R+20){
+        // Deflect enemies away from the sub
+        if(d < ARC_R+10){
           const ang=Math.atan2(e.y-cy2, e.x-cx2);
-          e.x=cx2+Math.cos(ang)*(SHIELD_R+22);
-          e.y=cy2+Math.sin(ang)*(SHIELD_R+22);
+          e.x=cx2+Math.cos(ang)*(ARC_R+12);
+          e.y=cy2+Math.sin(ang)*(ARC_R+12);
         }
       }
     }
-    // Detonate armed mines inside damage radius
+    // Detonate mines inside arc zone
     for(let i=S.mines.length-1;i>=0;i--){
       const m=S.mines[i];
       if(Math.hypot(m.x-cx2,m.y-cy2)<DAMAGE_R+m.r){
@@ -1061,8 +998,6 @@ function update(){
         S.score+=75; S.mines.splice(i,1);
       }
     }
-    // Sub is fully invincible while shield is up
-    sub.inv=Math.max(sub.inv, 3);
   }
 
   if(S.laserOn){
@@ -1948,75 +1883,93 @@ function drawParticle(p){
 }
 
 function drawLaserRing(){
-  if(!S||!S.laserRing) return;
+  if(!S||!S.laserRingActive) return;
   const sub=S.sub;
   const cx=sub.x+sub.w/2, cy=sub.y+sub.h/2;
-  const R=72;
-  // Fade in first 20 frames, fade out last 40 frames
-  const fade=Math.min(1, S.laserRingTimer/40) * Math.min(1,(300-S.laserRingTimer+1)/20);
-  const pulse=Math.sin(S.time*0.22)*0.5+0.5;
+  const R=80;
   const a=S.laserRingAngle;
+  const pulse=Math.sin(S.time*0.18)*0.5+0.5;
+  const fade=Math.min(1, S.laserRingTimer/60); // fade out last 60 frames
   ctx.save();
+  ctx.globalAlpha=fade;
 
-  // ── OUTER AURA GLOW ──
-  const aura=ctx.createRadialGradient(cx,cy,R*0.6,cx,cy,R*1.5);
-  aura.addColorStop(0,`rgba(0,255,255,${0.14*fade})`);
-  aura.addColorStop(0.5,`rgba(0,180,255,${0.08*fade})`);
-  aura.addColorStop(1,'rgba(0,0,255,0)');
-  ctx.beginPath(); ctx.arc(cx,cy,R*1.5,0,Math.PI*2);
+  // ── SUBTLE INNER GLOW — shows shield presence ──
+  const aura=ctx.createRadialGradient(cx,cy,R*0.4,cx,cy,R*1.2);
+  aura.addColorStop(0,'rgba(0,255,255,0)');
+  aura.addColorStop(0.7,`rgba(0,200,255,${0.04+pulse*0.03})`);
+  aura.addColorStop(1,'rgba(0,100,255,0)');
+  ctx.beginPath(); ctx.arc(cx,cy,R*1.2,0,Math.PI*2);
   ctx.fillStyle=aura; ctx.fill();
 
-  // ── SHIELD BUBBLE FILL ──
-  const fill=ctx.createRadialGradient(cx,cy,0,cx,cy,R);
-  fill.addColorStop(0,`rgba(0,80,180,${0.06*fade})`);
-  fill.addColorStop(0.7,`rgba(0,200,255,${0.10*fade})`);
-  fill.addColorStop(1,`rgba(0,255,255,${0.22*fade})`);
-  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
-  ctx.fillStyle=fill; ctx.fill();
+  // ── 3 SPINNING LASER ARCS at different radii & speeds ──
+  // Arc 1 — primary, fast spin, cyan, 120° arc
+  ctx.beginPath();
+  ctx.arc(cx,cy,R, a, a+Math.PI*0.67);
+  ctx.strokeStyle=`rgba(0,255,255,${0.85+pulse*0.15})`;
+  ctx.lineWidth=3;
+  ctx.shadowColor='#0ff'; ctx.shadowBlur=18; ctx.stroke();
 
-  // ── MAIN SHIELD RING ──
-  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
-  ctx.strokeStyle=`rgba(0,255,255,${(0.7+pulse*0.3)*fade})`;
-  ctx.lineWidth=3.5;
-  ctx.shadowColor='#0ff'; ctx.shadowBlur=28*fade; ctx.stroke();
+  // Arc 1 — opposite 120° arc spinning same direction (two-blade look)
+  ctx.beginPath();
+  ctx.arc(cx,cy,R, a+Math.PI, a+Math.PI*1.67);
+  ctx.strokeStyle=`rgba(0,220,255,${0.7+pulse*0.2})`;
+  ctx.lineWidth=2.5;
+  ctx.shadowColor='#0ff'; ctx.shadowBlur=14; ctx.stroke();
+
+  // Arc 2 — counter-rotating, slightly smaller, electric blue, 90° arc
+  const a2 = -a * 1.4; // counter-rotate faster
+  ctx.beginPath();
+  ctx.arc(cx,cy,R-14, a2, a2+Math.PI*0.5);
+  ctx.strokeStyle=`rgba(80,180,255,${0.75+pulse*0.2})`;
+  ctx.lineWidth=2;
+  ctx.shadowColor='#48f'; ctx.shadowBlur=12; ctx.stroke();
+
+  // Arc 2 opposite
+  ctx.beginPath();
+  ctx.arc(cx,cy,R-14, a2+Math.PI, a2+Math.PI*1.5);
+  ctx.strokeStyle=`rgba(80,180,255,${0.6+pulse*0.2})`;
+  ctx.lineWidth=2;
+  ctx.shadowColor='#48f'; ctx.shadowBlur=10; ctx.stroke();
+
+  // Arc 3 — outermost, slow, white-hot tips, 60° arc
+  const a3 = a * 0.5;
+  ctx.beginPath();
+  ctx.arc(cx,cy,R+10, a3, a3+Math.PI*0.33);
+  ctx.strokeStyle=`rgba(200,255,255,${0.55+pulse*0.35})`;
+  ctx.lineWidth=1.8;
+  ctx.shadowColor='#fff'; ctx.shadowBlur=20; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx,cy,R+10, a3+Math.PI, a3+Math.PI*1.33);
+  ctx.strokeStyle=`rgba(200,255,255,${0.45+pulse*0.3})`;
+  ctx.lineWidth=1.8;
+  ctx.shadowColor='#fff'; ctx.shadowBlur=16; ctx.stroke();
+
   ctx.shadowBlur=0;
 
-  // ── INNER RING ──
-  ctx.beginPath(); ctx.arc(cx,cy,R-10,0,Math.PI*2);
-  ctx.strokeStyle=`rgba(100,255,255,${0.25*fade})`;
-  ctx.lineWidth=1.2; ctx.stroke();
-
-  // ── 6 SPINNING LATTICE ARCS (energy web pattern) ──
-  for(let i=0;i<6;i++){
-    const ba=a+i*(Math.PI/3);
-    // Arc segment on the ring surface
+  // ── BRIGHT TIP SPARKS — glowing dots at arc endpoints ──
+  const tips=[
+    [R, a],          [R, a+Math.PI*0.67],
+    [R, a+Math.PI],  [R, a+Math.PI*1.67],
+    [R-14, a2],      [R-14, a2+Math.PI],
+    [R+10, a3],      [R+10, a3+Math.PI],
+  ];
+  for(const [r,ang] of tips){
     ctx.beginPath();
-    ctx.arc(cx,cy,R, ba, ba+Math.PI/4);
-    ctx.strokeStyle=`rgba(180,255,255,${(0.5+pulse*0.4)*fade})`;
-    ctx.lineWidth=2.5;
-    ctx.shadowColor='#fff'; ctx.shadowBlur=10*fade; ctx.stroke();
-    ctx.shadowBlur=0;
-    // Spoke from center
-    ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(ba)*20, cy+Math.sin(ba)*20);
-    ctx.lineTo(cx+Math.cos(ba)*R,  cy+Math.sin(ba)*R);
-    ctx.strokeStyle=`rgba(0,255,220,${0.18*fade})`;
-    ctx.lineWidth=1; ctx.stroke();
-    // Node dot at ring edge
-    const nx=cx+Math.cos(ba)*R, ny=cy+Math.sin(ba)*R;
-    ctx.beginPath(); ctx.arc(nx,ny,4,0,Math.PI*2);
-    ctx.fillStyle=`rgba(255,255,255,${(0.7+pulse*0.3)*fade})`;
-    ctx.shadowColor='#0ff'; ctx.shadowBlur=12*fade; ctx.fill();
-    ctx.shadowBlur=0;
+    ctx.arc(cx+Math.cos(ang)*r, cy+Math.sin(ang)*r, 3.5, 0, Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${0.8+pulse*0.2})`;
+    ctx.shadowColor='#0ff'; ctx.shadowBlur=14; ctx.fill();
   }
+  ctx.shadowBlur=0;
+  ctx.globalAlpha=1;
 
-  // ── TIMER BAR — arc showing seconds remaining ──
-  const pct=S.laserRingTimer/300;
-  const timerCol = pct>0.4 ? '#0ff' : pct>0.2 ? '#ff0' : '#f44';
+  // ── TIMER ARC — shows how long left ──
+  const pct=S.laserRingTimer/360;
+  const tcol=pct>0.4?'#0ff':pct>0.2?'#ff0':'#f44';
   ctx.beginPath();
-  ctx.arc(cx,cy,R+8, -Math.PI/2, -Math.PI/2+Math.PI*2*pct);
-  ctx.strokeStyle=timerCol; ctx.lineWidth=3;
-  ctx.shadowColor=timerCol; ctx.shadowBlur=10; ctx.stroke();
+  ctx.arc(cx,cy,R+18,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
+  ctx.strokeStyle=tcol; ctx.lineWidth=2.5;
+  ctx.shadowColor=tcol; ctx.shadowBlur=8; ctx.stroke();
   ctx.shadowBlur=0;
 
   ctx.restore();
