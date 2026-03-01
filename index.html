@@ -1733,106 +1733,185 @@ function drawShrimp(e){
 }
 
 // ═══════════════════════════════════════════════════
-//  DRAW SUBMARINE
+//  DRAW SUBMARINE — military war sub
 // ═══════════════════════════════════════════════════
 function drawSub(){
   const sub=S.sub;
   const flash=sub.flash>0&&Math.floor(sub.flash/5)%2===1;
   const cx=sub.x+sub.w/2, cy=sub.y+sub.h/2;
+  const W2=sub.w/2, H2=sub.h/2;
   ctx.save(); ctx.translate(cx,cy);
 
-  // Engine exhaust particle spawn
-  if(S.time%4===0&&(Math.abs(sub.vx)>.4||Math.abs(sub.vy)>.4))
-    spawnParts(cx-sub.w/2+2,cy+rand(-6,6),'#9df',1,.9,24);
+  // Propeller wash bubbles
+  if(S.time%3===0)
+    spawnParts(cx-W2+4,cy+rand(-7,7),'rgba(140,210,255,0.7)',1,.8,22);
 
-  // Shield bubble
+  // ── SHIELD BUBBLE ──
   if(sub.shield>0){
     const sa=sub.shield/sub.maxShield;
-    const sg=ctx.createRadialGradient(0,0,38,0,0,56);
-    sg.addColorStop(0,`rgba(0,150,255,${sa*.09})`); sg.addColorStop(1,'rgba(0,80,220,0)');
-    ctx.fillStyle=sg; ctx.beginPath(); ctx.ellipse(0,0,58,50,0,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0,0,55,47,0,0,Math.PI*2);
-    ctx.strokeStyle=`rgba(50,175,255,${sa*.72+Math.sin(S.time*.1)*.1})`;
-    ctx.lineWidth=2.2; ctx.shadowColor='#0af'; ctx.shadowBlur=22; ctx.stroke(); ctx.shadowBlur=0;
+    const sg=ctx.createRadialGradient(0,0,38,0,0,60);
+    sg.addColorStop(0,`rgba(0,150,255,${sa*.1})`); sg.addColorStop(1,'rgba(0,80,220,0)');
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.ellipse(0,0,62,52,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,0,60,50,0,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(50,175,255,${sa*.8+Math.sin(S.time*.1)*.1})`;
+    ctx.lineWidth=2.5; ctx.shadowColor='#0af'; ctx.shadowBlur=24; ctx.stroke(); ctx.shadowBlur=0;
   }
 
-  // Engine wake
-  const propOff=-sub.w/2+2;
-  const wg=ctx.createRadialGradient(propOff,0,0,propOff,0,26);
-  wg.addColorStop(0,'rgba(95,195,255,.52)'); wg.addColorStop(.4,'rgba(45,95,255,.2)'); wg.addColorStop(1,'rgba(0,20,100,0)');
-  ctx.fillStyle=wg; ctx.beginPath(); ctx.ellipse(propOff,0,26,13,0,0,Math.PI*2); ctx.fill();
+  if(flash){ctx.shadowColor='#f44';ctx.shadowBlur=28;}
 
-  ctx.save();
-  if(flash){ctx.shadowColor='#f44';ctx.shadowBlur=24;}
-
-  // Hull gradient
-  const hG=ctx.createLinearGradient(0,-sub.h/2,0,sub.h/2);
-  hG.addColorStop(0,flash?'#887':'#3878ae');
-  hG.addColorStop(.3,flash?'#665':'#1d5888');
-  hG.addColorStop(.7,flash?'#554':'#133c68');
-  hG.addColorStop(1,flash?'#443':'#0c2848');
+  // ── MAIN HULL — dark military steel ──
+  const hG=ctx.createLinearGradient(0,-H2,0,H2);
+  hG.addColorStop(0, flash?'#776655':'#2a3d52');
+  hG.addColorStop(.28,flash?'#554433':'#1a2d40');
+  hG.addColorStop(.72,flash?'#443322':'#111e2e');
+  hG.addColorStop(1,  flash?'#332211':'#080e1a');
   ctx.fillStyle=hG;
   ctx.beginPath();
-  ctx.moveTo(-sub.w/2+7,-sub.h/2+4);
-  ctx.quadraticCurveTo(sub.w/2-12,-sub.h/2,sub.w/2-4,0);
-  ctx.quadraticCurveTo(sub.w/2-12,sub.h/2,-sub.w/2+7,sub.h/2-4);
-  ctx.quadraticCurveTo(-sub.w/2,-sub.h/4,-sub.w/2+5,0);
-  ctx.quadraticCurveTo(-sub.w/2,sub.h/4,-sub.w/2+7,-sub.h/2+4);
+  // Pointed nose
+  ctx.moveTo(W2-2,0);
+  ctx.quadraticCurveTo(W2+6,-4, W2-2,0); // tip
+  ctx.lineTo(W2-2, -H2+6);
+  ctx.quadraticCurveTo(W2-18,-H2, -W2+18,-H2+3);
+  ctx.quadraticCurveTo(-W2+4,-H2+6, -W2+4,-H2/2);
+  ctx.quadraticCurveTo(-W2,-H2/4, -W2+2,0);
+  ctx.quadraticCurveTo(-W2,-H2/4*(-1), -W2+4,H2/2);
+  ctx.quadraticCurveTo(-W2+4,H2-6, -W2+18,H2-3);
+  ctx.quadraticCurveTo(W2-18,H2, W2-2,H2-6);
+  ctx.lineTo(W2-2,0);
+  ctx.closePath();
   ctx.fill();
 
-  // Plating
-  ctx.strokeStyle='rgba(78,142,192,.28)'; ctx.lineWidth=.85;
-  for(let p=-1;p<=1;p+=2){
-    ctx.beginPath(); ctx.moveTo(-sub.w/2+14,p*(sub.h/2-9)); ctx.lineTo(sub.w/2-22,p*(sub.h/2-9)); ctx.stroke();
-  }
-  // Rivets
-  ctx.fillStyle='rgba(78,136,185,.58)';
-  for(let rx=-sub.w/2+14;rx<sub.w/2-14;rx+=13){
-    ctx.beginPath(); ctx.arc(rx,-sub.h/2+7,1.4,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(rx,sub.h/2-7,1.4,0,Math.PI*2); ctx.fill();
-  }
-  // Shine
-  ctx.beginPath(); ctx.moveTo(-sub.w/2+9,-sub.h/2+7);
-  ctx.quadraticCurveTo(0,-sub.h/2-1,sub.w/2-11,-sub.h/2+7);
-  ctx.strokeStyle='rgba(172,222,255,.22)'; ctx.lineWidth=3; ctx.stroke();
-  ctx.restore();
+  // Hull outline
+  ctx.strokeStyle=flash?'rgba(255,100,60,.6)':'rgba(60,100,150,.55)';
+  ctx.lineWidth=1.2; ctx.stroke(); ctx.shadowBlur=0;
 
-  // Conning tower
+  // ── ARMOUR PLATING PANELS ──
+  ctx.strokeStyle='rgba(55,85,120,.5)'; ctx.lineWidth=1;
+  // Horizontal panel lines
+  [-H2+8, -H2/2, H2/2, H2-8].forEach(y=>{
+    ctx.beginPath(); ctx.moveTo(-W2+20,y); ctx.lineTo(W2-20,y); ctx.stroke();
+  });
+  // Vertical panel dividers
+  [-W2+28, -W2+52, 0, W2-30].forEach(x=>{
+    ctx.beginPath(); ctx.moveTo(x,-H2+8); ctx.lineTo(x,H2-8); ctx.stroke();
+  });
+
+  // ── HULL MARKINGS / NUMBERS ──
+  ctx.fillStyle='rgba(180,220,255,.18)';
+  ctx.font='bold 7px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('SS-47',0,1);
+
+  // ── BALLAST TANKS (rounded bumps on belly) ──
+  ctx.fillStyle='rgba(22,38,60,.9)';
+  ctx.strokeStyle='rgba(50,80,120,.6)'; ctx.lineWidth=.8;
+  [-20,0,20].forEach(x=>{
+    ctx.beginPath(); ctx.ellipse(x,H2-3,10,5,0,0,Math.PI); ctx.fill(); ctx.stroke();
+  });
+
+  // ── RIVETS along hull edges ──
+  ctx.fillStyle='rgba(80,120,170,.7)';
+  for(let rx=-W2+22;rx<W2-18;rx+=11){
+    ctx.beginPath(); ctx.arc(rx,-H2+5,1.6,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(rx, H2-5,1.6,0,Math.PI*2); ctx.fill();
+  }
+
+  // ── TOP SHINE ──
+  ctx.beginPath();
+  ctx.moveTo(-W2+22,-H2+6);
+  ctx.quadraticCurveTo(0,-H2+2, W2-20,-H2+6);
+  ctx.strokeStyle='rgba(160,210,255,.18)'; ctx.lineWidth=4; ctx.stroke();
+
+  // ── CONNING TOWER — tall armoured sail ──
   ctx.save();
-  const ctG=ctx.createLinearGradient(-9,-sub.h/2-18,9,-sub.h/2);
-  ctG.addColorStop(0,'#2a5888'); ctG.addColorStop(1,'#1a3868');
-  ctx.fillStyle=ctG; ctx.strokeStyle='rgba(78,148,195,.5)'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.roundRect(-8,-sub.h/2-18,16,20,3); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(0,-sub.h/2-9.5,4,5.5,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,192,255,.22)'; ctx.strokeStyle='rgba(95,192,255,.65)'; ctx.lineWidth=1; ctx.fill(); ctx.stroke();
+  const twG=ctx.createLinearGradient(-11,-H2-32,11,-H2);
+  twG.addColorStop(0,'#233a52'); twG.addColorStop(.5,'#1a2d42'); twG.addColorStop(1,'#101e30');
+  ctx.fillStyle=twG;
+  ctx.beginPath(); ctx.roundRect(-11,-H2-34,22,36,4); ctx.fill();
+  ctx.strokeStyle='rgba(65,110,160,.6)'; ctx.lineWidth=1; ctx.strokeRect(-11,-H2-34,22,36);
+  // Tower panel lines
+  ctx.strokeStyle='rgba(60,100,150,.45)'; ctx.lineWidth=.8;
+  ctx.beginPath(); ctx.moveTo(-11,-H2-18); ctx.lineTo(11,-H2-18); ctx.stroke();
+  // Tower viewport slit
+  ctx.fillStyle='rgba(0,180,255,.15)';
+  ctx.strokeStyle='rgba(0,200,255,.55)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.roundRect(-7,-H2-28,14,8,2); ctx.fill(); ctx.stroke();
+  // Red warning light on tower top
+  const blink=Math.floor(S.time/18)%2;
+  ctx.beginPath(); ctx.arc(0,-H2-36,3,0,Math.PI*2);
+  ctx.fillStyle=blink?'rgba(255,60,60,.95)':'rgba(80,20,20,.6)';
+  ctx.shadowColor='#f00'; ctx.shadowBlur=blink?12:0; ctx.fill(); ctx.shadowBlur=0;
   ctx.restore();
 
-  // Periscope
-  ctx.strokeStyle='rgba(65,124,174,.82)'; ctx.lineWidth=2; ctx.lineCap='round';
-  ctx.beginPath(); ctx.moveTo(3,-sub.h/2-18); ctx.lineTo(3,-sub.h/2-27); ctx.lineTo(13,-sub.h/2-27); ctx.stroke();
-  ctx.fillStyle='rgba(46,116,174,.88)'; ctx.beginPath(); ctx.roundRect(10,-sub.h/2-30,7,7,1); ctx.fill();
+  // ── PERISCOPE ──
+  ctx.strokeStyle='rgba(60,100,155,.85)'; ctx.lineWidth=2.5; ctx.lineCap='square';
+  ctx.beginPath(); ctx.moveTo(5,-H2-34); ctx.lineTo(5,-H2-46); ctx.lineTo(18,-H2-46); ctx.stroke();
+  // Periscope head
+  ctx.fillStyle='rgba(30,55,90,.95)';
+  ctx.beginPath(); ctx.roundRect(15,-H2-50,8,9,2); ctx.fill();
+  ctx.strokeStyle='rgba(0,180,255,.7)'; ctx.lineWidth=1; ctx.strokeRect(15,-H2-50,8,9);
+  // Periscope lens glint
+  ctx.beginPath(); ctx.arc(19,-H2-45,2.5,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,220,255,.8)'; ctx.shadowColor='#0cf'; ctx.shadowBlur=8; ctx.fill(); ctx.shadowBlur=0;
 
-  // Torpedo tube
-  ctx.fillStyle='rgba(37,74,116,.92)';
-  ctx.beginPath(); ctx.roundRect(sub.w/2-8,-4.5,22,9,2.5); ctx.fill();
-  ctx.strokeStyle='rgba(75,156,216,.52)'; ctx.lineWidth=1; ctx.strokeRect(sub.w/2-8,-4.5,22,9);
-  // Muzzle glow color by weapon
-  const wc={cannon:'0,192,255',spread:'255,145,45',rocket:'255,75,25',homing:'195,45,255',laser:'0,225,255',homing_rocket:'255,106,0',multi_rocket:'255,50,0',multi_laser:'0,255,204'};
+  // ── TORPEDO TUBES (dual barrel) ──
+  ctx.fillStyle='rgba(25,45,72,.95)';
+  ctx.strokeStyle='rgba(60,130,200,.6)'; ctx.lineWidth=1.2;
+  // Upper tube
+  ctx.beginPath(); ctx.roundRect(W2-6,-9,28,8,3); ctx.fill(); ctx.stroke();
+  // Lower tube
+  ctx.beginPath(); ctx.roundRect(W2-6,1,28,8,3); ctx.fill(); ctx.stroke();
+  // Tube separation ridge
+  ctx.strokeStyle='rgba(40,80,130,.8)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(W2-4,-0.5); ctx.lineTo(W2+20,-0.5); ctx.stroke();
+
+  // ── MUZZLE GLOW (weapon-tinted) ──
+  const wc={cannon:'0,192,255',spread:'255,145,45',rocket:'255,75,25',homing:'195,45,255',
+    laser:'0,255,255',homing_rocket:'255,106,0',multi_rocket:'255,50,0',multi_laser:'0,255,204',
+    laser_ring:'0,255,255',mega_bomb:'255,120,0',omni_homing:'220,0,255',hydra:'255,140,0',
+    gatling:'255,0,170',machinegun:'255,220,0'};
   const mc=wc[S.weapon]||'0,192,255';
-  const mg=ctx.createRadialGradient(sub.w/2+14,0,0,sub.w/2+14,0,10);
-  mg.addColorStop(0,`rgba(${mc},.85)`); mg.addColorStop(1,`rgba(${mc},0)`);
-  ctx.fillStyle=mg; ctx.beginPath(); ctx.ellipse(sub.w/2+14,0,10,7,0,0,Math.PI*2); ctx.fill();
+  const mg=ctx.createRadialGradient(W2+22,0,0,W2+22,0,14);
+  mg.addColorStop(0,`rgba(${mc},.9)`); mg.addColorStop(1,`rgba(${mc},0)`);
+  ctx.fillStyle=mg; ctx.beginPath(); ctx.ellipse(W2+22,0,14,9,0,0,Math.PI*2); ctx.fill();
 
-  // Propeller
-  ctx.save(); ctx.translate(propOff+2,0);
-  for(let i=0;i<3;i++){
-    const a=S.time*.18+i*Math.PI*2/3;
-    const pg=ctx.createLinearGradient(0,0,Math.cos(a)*14,Math.sin(a)*14);
-    pg.addColorStop(0,'rgba(78,155,206,.9)'); pg.addColorStop(1,'rgba(36,96,146,.62)');
-    ctx.fillStyle=pg; ctx.beginPath(); ctx.ellipse(Math.cos(a)*7,Math.sin(a)*7,6,2.5,a,0,Math.PI*2); ctx.fill();
+  // ── DIVE PLANES (horizontal fins) ──
+  ctx.fillStyle='rgba(28,50,80,.9)';
+  ctx.strokeStyle='rgba(55,95,145,.55)'; ctx.lineWidth=1;
+  // Forward planes
+  [[-H2+2,6],[H2-8,6]].forEach(([y,h])=>{
+    ctx.beginPath();
+    ctx.moveTo(W2-30,y); ctx.lineTo(W2-14,y); ctx.lineTo(W2-10,y+h); ctx.lineTo(W2-30,y+h);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  });
+  // Rear stabiliser fins
+  ctx.beginPath();
+  ctx.moveTo(-W2+8,-H2+2); ctx.lineTo(-W2+22,-H2+2); ctx.lineTo(-W2+18,-H2+10); ctx.lineTo(-W2+8,-H2+10);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-W2+8,H2-2); ctx.lineTo(-W2+22,H2-2); ctx.lineTo(-W2+18,H2-10); ctx.lineTo(-W2+8,H2-10);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── PROPELLER ──
+  ctx.save(); ctx.translate(-W2+5,0);
+  ctx.strokeStyle='rgba(50,110,170,.8)'; ctx.lineWidth=1;
+  for(let i=0;i<4;i++){
+    const a=S.time*.14+i*Math.PI/2;
+    const pg=ctx.createLinearGradient(0,0,Math.cos(a)*16,Math.sin(a)*16);
+    pg.addColorStop(0,'rgba(90,160,220,.95)'); pg.addColorStop(1,'rgba(30,70,120,.5)');
+    ctx.fillStyle=pg;
+    ctx.beginPath(); ctx.ellipse(Math.cos(a)*8,Math.sin(a)*8,7,2.5,a,0,Math.PI*2); ctx.fill();
+    ctx.stroke();
   }
-  ctx.beginPath(); ctx.arc(0,0,3.2,0,Math.PI*2); ctx.fillStyle='rgba(96,175,226,.92)'; ctx.fill();
+  // Prop hub
+  ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2);
+  ctx.fillStyle='rgba(100,170,230,.95)'; ctx.fill();
+  ctx.strokeStyle='rgba(40,90,150,.8)'; ctx.lineWidth=1; ctx.stroke();
   ctx.restore();
+
+  // ── CAVITATION WAKE ──
+  const wg=ctx.createRadialGradient(-W2+5,0,0,-W2+5,0,30);
+  wg.addColorStop(0,'rgba(100,200,255,.35)'); wg.addColorStop(.5,'rgba(40,90,200,.12)'); wg.addColorStop(1,'rgba(0,20,80,0)');
+  ctx.fillStyle=wg; ctx.beginPath(); ctx.ellipse(-W2+5,0,30,14,0,0,Math.PI*2); ctx.fill();
 
   ctx.restore();
 }
@@ -1889,22 +1968,69 @@ function drawBullet(b){
 
 function drawLaser(){
   const sub=S.sub;
-  const baseCy=sub.y+sub.h/2, cx=sub.x+sub.w;
+  const baseCy=sub.y+sub.h/2, cx=sub.x+sub.w+20;
   const beams=S.laserBeams||1;
-  const offsets=beams===1?[0]:[-16,0,16];
-  const col=beams>1?'0,255,204':'0,225,255';
+  const isTriple=beams>1;
+  const offsets=isTriple?[-16,0,16]:[0];
+  // Single = hot cyan, triple = toxic green-cyan
+  const coreRGB=isTriple?'120,255,210':'0,240,255';
+  const glowRGB=isTriple?'0,200,160':'0,150,255';
+  const outerRGB=isTriple?'0,255,180':'0,80,200';
+  const flicker=Math.random();
   ctx.save();
+
   for(const off of offsets){
     const cy=baseCy+off;
-    [[28,.03],[14,.09],[6,.88],[1.5,1]].forEach(([lw,la])=>{
-      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W,cy);
-      ctx.strokeStyle=`rgba(${col},${la})`; ctx.lineWidth=lw; ctx.stroke();
-    });
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W,cy);
-    ctx.strokeStyle=`rgba(255,255,255,${.65+Math.random()*.35})`;
-    ctx.lineWidth=1.6; ctx.shadowColor=`rgb(${col})`; ctx.shadowBlur=32; ctx.stroke();
-    if(Math.random()<.4) spawnParts(cx+rand(50,W-cx),cy+rand(-4,4),`rgb(${col})`,1,1.6,15);
+
+    // ── OUTER ENERGY HALO ──
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W+10,cy);
+    ctx.strokeStyle=`rgba(${outerRGB},${.04+flicker*.02})`;
+    ctx.lineWidth=isTriple?38:50; ctx.stroke();
+
+    // ── MID GLOW ──
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W+10,cy);
+    ctx.strokeStyle=`rgba(${glowRGB},${.12+flicker*.06})`;
+    ctx.lineWidth=isTriple?18:26; ctx.stroke();
+
+    // ── CORE BEAM ──
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W+10,cy);
+    ctx.strokeStyle=`rgba(${coreRGB},${.8+flicker*.15})`;
+    ctx.lineWidth=isTriple?4.5:6;
+    ctx.shadowColor=`rgb(${coreRGB})`; ctx.shadowBlur=isTriple?28:40;
+    ctx.stroke(); ctx.shadowBlur=0;
+
+    // ── HOT WHITE CENTER ──
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(W+10,cy);
+    ctx.strokeStyle=`rgba(255,255,255,${.55+flicker*.4})`;
+    ctx.lineWidth=isTriple?1.8:2.5; ctx.stroke();
+
+    // ── ENERGY DISTORTION SPARKS along beam ──
+    if(Math.random()<.5){
+      const sx=cx+rand(30,W-cx);
+      const sy=cy+rand(-3,3);
+      spawnParts(sx,sy,`rgba(${coreRGB},0.9)`,2,2,12);
+    }
+
+    // ── MUZZLE FLASH at origin ──
+    const mG=ctx.createRadialGradient(cx,cy,0,cx,cy,isTriple?20:28);
+    mG.addColorStop(0,`rgba(255,255,255,.95)`);
+    mG.addColorStop(.3,`rgba(${coreRGB},.8)`);
+    mG.addColorStop(1,`rgba(${outerRGB},0)`);
+    ctx.beginPath(); ctx.arc(cx,cy,isTriple?20:28,0,Math.PI*2);
+    ctx.fillStyle=mG; ctx.fill();
   }
+
+  // ── BEAM EDGE CRACKLING (triple only — arcs between beams) ──
+  if(isTriple&&Math.random()<.3){
+    ctx.strokeStyle=`rgba(150,255,220,${.4+Math.random()*.4})`;
+    ctx.lineWidth=1;
+    const bx=cx+rand(40,200);
+    ctx.beginPath();
+    ctx.moveTo(bx,baseCy-16);
+    ctx.quadraticCurveTo(bx+rand(-20,20),baseCy,bx,baseCy+16);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
