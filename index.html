@@ -11,13 +11,15 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>RADIOACTIVE SHRIMP</title>
 <script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, getDoc, setDoc, serverTimestamp }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-  // ── PASTE YOUR FIREBASE CONFIG HERE ──
-  // Firebase Console → Project Settings → Your Apps → Web App → SDK setup
-   const firebaseConfig = {
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
   apiKey: "AIzaSyBpkxV6VunQTSm3yT_FZfvlREOCYgIacCc",
   authDomain: "radioactive-shrimp.firebaseapp.com",
   projectId: "radioactive-shrimp",
@@ -26,6 +28,10 @@
   appId: "1:364663379757:web:ffcbf1cdeeffa7c7f8a5a4",
   measurementId: "G-73X4THKBPV"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
   // ─────────────────────────────────────
 
   const app = initializeApp(firebaseConfig);
@@ -243,20 +249,30 @@ let fbReady = false;
 
 window.addEventListener('fbReady', () => {
   fbReady = true;
-  // Fetch personal best from Firestore and reconcile with localStorage
-  // so returning players on a new device get their score back
+  // Reconcile local PB with Firestore — whichever is higher wins,
+  // and push the local PB up to Firestore if it's better (catches scores
+  // that were set before Firebase was configured)
   if(playerName && window._db) {
     const pbRef = window._doc(window._db, 'personal_bests', playerName);
     window._getDoc(pbRef).then(snap => {
-      if(snap.exists()) {
-        const remotePB = snap.data().score || 0;
-        if(remotePB > personalBest) {
-          personalBest = remotePB;
-          localStorage.setItem('radShrimp_pb', remotePB);
-          // Refresh PB display if leaderboard is open
-          const pbEl = document.getElementById('pbVal');
-          if(pbEl) pbEl.textContent = personalBest.toLocaleString();
-        }
+      const remotePB = snap.exists() ? (snap.data().score || 0) : 0;
+      if(remotePB > personalBest) {
+        // Firestore has a better score — update local
+        personalBest = remotePB;
+        localStorage.setItem('radShrimp_pb', remotePB);
+        const pbEl = document.getElementById('pbVal');
+        if(pbEl) pbEl.textContent = personalBest.toLocaleString();
+      } else if(personalBest > remotePB && personalBest > 0) {
+        // Local has a better score — push it up to Firestore
+        window._setDoc(pbRef, {
+          name: playerName,
+          score: personalBest,
+          level: 0,
+          dateStr: 'Before leaderboard',
+          timestamp: window._serverTimestamp()
+        }).then(()=>{
+          console.log('Historic PB synced to Firestore:', personalBest);
+        }).catch(()=>{});
       }
     }).catch(()=>{});
   }
@@ -357,7 +373,11 @@ async function loadLeaderboard(highlightScore=null) {
       const d = docSnap.data();
       const isYou = d.name === playerName && d.score === highlightScore;
       if(isYou) found = true;
-      const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleDateString() : '—';
+      let date = '—';
+      if(d.timestamp) {
+        try { date = new Date(d.timestamp.toDate()).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e){}
+      }
+      if(date==='—' && d.dateStr) date = d.dateStr;
       const tr = document.createElement('tr');
       tr.className = isYou ? 'you' : (rank===1?'rank1':rank===2?'rank2':rank===3?'rank3':'');
       tr.innerHTML = `<td>${rank}</td><td>${d.name||'???'}</td><td>${(d.score||0).toLocaleString()}</td><td>${d.level||1}</td><td>${date}</td>`;
@@ -371,27 +391,39 @@ async function loadLeaderboard(highlightScore=null) {
 }
 
 async function submitScore(score, level) {
-  // Update personal best
+  // Update personal best locally
   if(score > personalBest) {
     personalBest = score;
     localStorage.setItem('radShrimp_pb', score);
   }
-  if(!fbReady || !window._db) return;
+  if(!fbReady || !window._db) {
+    console.warn('Score not submitted: Firebase not ready. fbReady='+fbReady+' _db='+(!!window._db));
+    return;
+  }
   try {
-    // Add to global scores collection
-    await window._addDoc(window._collection(window._db,'scores'), {
+    const now = new Date();
+    const docRef = await window._addDoc(window._collection(window._db,'scores'), {
       name: playerName || 'UNKNOWN',
       score, level,
-      timestamp: window._serverTimestamp()
+      timestamp: window._serverTimestamp(),
+      dateStr: now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
     });
-    // Update personal best doc (keyed by name)
+    console.log('Score saved! Doc ID:', docRef.id);
+    // Update personal best doc
     const pbRef = window._doc(window._db, 'personal_bests', playerName || 'UNKNOWN');
     const pbSnap = await window._getDoc(pbRef);
     if(!pbSnap.exists() || pbSnap.data().score < score) {
       await window._setDoc(pbRef, { name: playerName, score, level, timestamp: window._serverTimestamp() });
+      console.log('Personal best updated in Firestore:', score);
     }
   } catch(e) {
-    console.warn('Score submit failed:', e.message);
+    console.error('Score submit FAILED:', e.code, e.message);
+    // Show error in leaderboard status so player can see it
+    const status = document.getElementById('lbStatus');
+    if(status) {
+      status.style.color='#f44';
+      status.textContent = '⚠ Score save failed: ' + (e.code || e.message);
+    }
   }
 }
 
