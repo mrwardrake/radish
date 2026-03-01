@@ -44,7 +44,7 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html{height:100%;overflow:hidden;}
 
-body{background:#000;margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100vh;min-height:100dvh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
 #gc{position:fixed;top:0;left:0;width:820px;height:620px;transform-origin:top left;}
 canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rgba(0,120,255,0.35),0 0 100px rgba(0,40,180,0.25);}
 #ui{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 12px;pointer-events:none;z-index:10;gap:6px;}
@@ -112,9 +112,9 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 #lbBtn{position:absolute;bottom:8px;left:10px;background:rgba(0,4,18,.75);border:1px solid rgba(0,180,255,.3);color:#0af;font-size:11px;font-family:'Orbitron',sans-serif;padding:4px 9px;cursor:pointer;border-radius:3px;z-index:30;}
 
 /* ── TOUCH CONTROLS ── */
-#touchControls{display:none;position:fixed;bottom:0;bottom:env(safe-area-inset-bottom,0);left:0;right:0;height:160px;z-index:40;pointer-events:none;user-select:none;}
-#joystickCanvas{position:absolute;bottom:10px;left:10px;pointer-events:all;touch-action:none;}
-#fireBtn{position:absolute;bottom:24px;right:24px;width:96px;height:96px;border-radius:50%;
+#touchControls{display:none;position:absolute;bottom:0;left:0;right:0;height:100%;z-index:40;pointer-events:none;user-select:none;}
+#joystickCanvas{position:absolute;bottom:12px;left:12px;pointer-events:all;touch-action:none;}
+#fireBtn{position:absolute;bottom:12px;right:12px;width:96px;height:96px;border-radius:50%;
   background:radial-gradient(circle at 40% 35%,rgba(255,100,100,0.35),rgba(180,0,0,0.25));
   border:3px solid rgba(255,80,80,0.8);color:rgba(255,180,180,0.95);
   font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;
@@ -125,8 +125,8 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 @media(max-width:900px){
   body{justify-content:flex-start;padding-top:4px;}
   #touchControls{display:block;}
-  #muteBtn{bottom:168px;}
-  #lbBtn{bottom:168px;}
+  #muteBtn{bottom:8px;}
+  #lbBtn{bottom:8px;}
   #lbTable{width:95vw;}
   #nameInput{width:80vw;max-width:300px;}
 }
@@ -140,7 +140,7 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 <body>
 <div id="gc">
   <canvas id="cv" width="820" height="620"></canvas>
-  <!-- Touch Controls -->
+  <!-- Touch Controls overlaid on canvas -->
   <div id="touchControls">
     <canvas id="joystickCanvas" width="150" height="150"></canvas>
     <div id="fireBtn">FIRE</div>
@@ -625,25 +625,61 @@ canvas.addEventListener('mouseup',()=>{keys['Space']=false;});
 
 // ── CANVAS SCALING — fits any screen ──
 function scaleCanvas(){
-  const gc = document.getElementById('gc');
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  // Always scale to fill the full screen
-  const scaleX = vw / 820;
-  const scaleY = vh / 620;
-  const scale = Math.min(scaleX, scaleY);
-  const scaledW = 820 * scale;
-  const scaledH = 620 * scale;
-  const left = (vw - scaledW) / 2;
-  const top = (vh - scaledH) / 2;
-  gc.style.transform = `scale(${scale})`;
-  gc.style.left = left + 'px';
-  gc.style.top = top + 'px';
+  const gc=document.getElementById('gc');
+  const vw=window.visualViewport?window.visualViewport.width:window.innerWidth;
+  const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+
+  // Debug
+  let dbg=document.getElementById('_dbg');
+  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';
+    dbg.style.cssText='position:fixed;top:2px;right:2px;background:rgba(0,0,0,.85);color:#0ff;font-size:11px;padding:3px 7px;z-index:9999;font-family:monospace;pointer-events:none;border-radius:3px;';
+    document.body.appendChild(dbg);}
+  dbg.textContent=`${Math.round(vw)}x${Math.round(vh)}`;
+
+  // Desktop — no scaling
+  if(vw>=1024&&vh>=700&&!('ontouchstart' in window)){gc.style.cssText='';return;}
+
+  // Touch controls overlay the canvas — scale to fill entire screen
+  const scale=Math.min(vw/820, vh/620);
+  const scaledW=820*scale, scaledH=620*scale;
+  gc.style.cssText='position:fixed;width:820px;height:620px;transform-origin:top left;margin:0;'+
+    `transform:scale(${scale});left:${Math.round((vw-scaledW)/2)}px;top:${Math.round((vh-scaledH)/2)}px;`;
 }
 scaleCanvas();
-window.addEventListener('resize', scaleCanvas);
-window.addEventListener('orientationchange', () => setTimeout(scaleCanvas, 300));
-if(window.visualViewport){ window.visualViewport.addEventListener('resize', scaleCanvas); };
+window.addEventListener('resize',scaleCanvas);
+window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,300));
+if(window.visualViewport){window.visualViewport.addEventListener('resize',scaleCanvas);}
+
+// ── ANALOG JOYSTICK ──
+(function(){
+  const jc=document.getElementById('joystickCanvas');
+  if(!jc) return;
+  const jx=jc.getContext('2d');
+  const SIZE=150, CX=75, CY=75, BASE_R=58, KNOB_R=26, DEAD=0.08;
+  let active=false, knobX=CX, knobY=CY, touchId=null;
+
+  function drawJoystick(){
+    jx.clearRect(0,0,SIZE,SIZE);
+    // ── BASE RING ──
+    const bg=jx.createRadialGradient(CX,CY,BASE_R*0.3,CX,CY,BASE_R);
+    bg.addColorStop(0,'rgba(0,60,100,0.5)');
+    bg.addColorStop(1,'rgba(0,30,60,0.25)');
+    jx.beginPath(); jx.arc(CX,CY,BASE_R,0,Math.PI*2);
+    jx.fillStyle=bg; jx.fill();
+    jx.strokeStyle='rgba(0,180,255,0.45)'; jx.lineWidth=2.5; jx.stroke();
+    // Inner ring
+    jx.beginPath(); jx.arc(CX,CY,BASE_R*0.55,0,Math.PI*2);
+    jx.strokeStyle='rgba(0,150,220,0.2)'; jx.lineWidth=1; jx.stroke();
+    // Crosshair lines
+    jx.strokeStyle='rgba(0,160,220,0.18)'; jx.lineWidth=1;
+    jx.beginPath(); jx.moveTo(CX-BASE_R,CY); jx.lineTo(CX+BASE_R,CY); jx.stroke();
+    jx.beginPath(); jx.moveTo(CX,CY-BASE_R); jx.lineTo(CX,CY+BASE_R); jx.stroke();
+    // Direction nubs
+    const nubCol=active?'rgba(0,220,255,0.5)':'rgba(0,160,200,0.25)';
+    [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
+      jx.beginPath(); jx.arc(CX+dx*(BASE_R-8),CY+dy*(BASE_R-8),4,0,Math.PI*2);
+      jx.fillStyle=nubCol; jx.fill();
+    });
 
     // ── KNOB ──
     const kDx=knobX-CX, kDy=knobY-CY;

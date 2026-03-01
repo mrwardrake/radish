@@ -1,4 +1,4 @@
-const CACHE = 'rad-shrimp-v9';
+const CACHE = 'rad-shrimp-v12';
 const ASSETS = [
   './',
   './index.html',
