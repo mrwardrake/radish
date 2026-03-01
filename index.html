@@ -2,7 +2,18 @@
 <html lang="en">
 <head>
 <link rel="manifest" href="manifest.json">
-<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+<script>if('serviceWorker' in navigator){
+  // Unregister ALL old service workers first to clear stale cache
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>r.unregister());
+  });
+  // Clear all caches
+  if(window.caches){
+    caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
+  }
+  // Re-register fresh after a short delay
+  setTimeout(()=>navigator.serviceWorker.register('sw.js'),500);
+}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -112,9 +123,9 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 #lbBtn{position:absolute;bottom:8px;left:10px;background:rgba(0,4,18,.75);border:1px solid rgba(0,180,255,.3);color:#0af;font-size:11px;font-family:'Orbitron',sans-serif;padding:4px 9px;cursor:pointer;border-radius:3px;z-index:30;}
 
 /* ── TOUCH CONTROLS ── */
-#touchControls{display:none;position:absolute;bottom:0;left:0;right:0;height:100%;z-index:40;pointer-events:none;user-select:none;}
-#joystickCanvas{position:absolute;bottom:12px;left:12px;pointer-events:all;touch-action:none;}
-#fireBtn{position:absolute;bottom:12px;right:12px;width:96px;height:96px;border-radius:50%;
+#touchControls{display:none;position:fixed;bottom:0;bottom:env(safe-area-inset-bottom,0);left:0;right:0;height:160px;z-index:40;pointer-events:none;user-select:none;}
+#joystickCanvas{position:absolute;bottom:10px;left:10px;pointer-events:all;touch-action:none;}
+#fireBtn{position:absolute;bottom:24px;right:24px;width:96px;height:96px;border-radius:50%;
   background:radial-gradient(circle at 40% 35%,rgba(255,100,100,0.35),rgba(180,0,0,0.25));
   border:3px solid rgba(255,80,80,0.8);color:rgba(255,180,180,0.95);
   font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;
@@ -125,8 +136,8 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 @media(max-width:900px){
   body{justify-content:flex-start;padding-top:4px;}
   #touchControls{display:block;}
-  #muteBtn{bottom:8px;}
-  #lbBtn{bottom:8px;}
+  #muteBtn{bottom:168px;}
+  #lbBtn{bottom:168px;}
   #lbTable{width:95vw;}
   #nameInput{width:80vw;max-width:300px;}
 }
@@ -140,7 +151,7 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 <body>
 <div id="gc">
   <canvas id="cv" width="820" height="620"></canvas>
-  <!-- Touch Controls overlaid on canvas -->
+  <!-- Touch Controls -->
   <div id="touchControls">
     <canvas id="joystickCanvas" width="150" height="150"></canvas>
     <div id="fireBtn">FIRE</div>
@@ -437,7 +448,7 @@ BG_B64.forEach((src, i) => {
 });
 const canvas = document.getElementById('cv');
 const ctx    = canvas.getContext('2d');
-const W = 820, H = 620;
+let W = 820, H = 620;
 
 // ═══════════════════════════════════════════════════
 //  AUDIO
@@ -626,24 +637,25 @@ canvas.addEventListener('mouseup',()=>{keys['Space']=false;});
 // ── CANVAS SCALING — fits any screen ──
 function scaleCanvas(){
   const gc=document.getElementById('gc');
+  const cv=document.getElementById('cv');
+  const isMobile='ontouchstart' in window;
   const vw=window.visualViewport?window.visualViewport.width:window.innerWidth;
   const vh=window.visualViewport?window.visualViewport.height:window.innerHeight;
 
-  // Debug
-  let dbg=document.getElementById('_dbg');
-  if(!dbg){dbg=document.createElement('div');dbg.id='_dbg';
-    dbg.style.cssText='position:fixed;top:2px;right:2px;background:rgba(0,0,0,.85);color:#0ff;font-size:11px;padding:3px 7px;z-index:9999;font-family:monospace;pointer-events:none;border-radius:3px;';
-    document.body.appendChild(dbg);}
-  dbg.textContent=`${Math.round(vw)}x${Math.round(vh)}`;
+  if(!isMobile){
+    // Desktop — reset, let flexbox center
+    cv.width=820; cv.height=620;
+    W=820; H=620;
+    gc.style.cssText='position:relative;width:820px;height:620px;';
+    return;
+  }
 
-  // Desktop — no scaling
-  if(vw>=1024&&vh>=700&&!('ontouchstart' in window)){gc.style.cssText='';return;}
-
-  // Touch controls overlay the canvas — scale to fill entire screen
-  const scale=Math.min(vw/820, vh/620);
-  const scaledW=820*scale, scaledH=620*scale;
-  gc.style.cssText='position:fixed;width:820px;height:620px;transform-origin:top left;margin:0;'+
-    `transform:scale(${scale});left:${Math.round((vw-scaledW)/2)}px;top:${Math.round((vh-scaledH)/2)}px;`;
+  // Mobile — resize canvas to exactly fill screen, no scaling transform
+  cv.width=Math.round(vw);
+  cv.height=Math.round(vh);
+  W=Math.round(vw);
+  H=Math.round(vh);
+  gc.style.cssText=`position:fixed;left:0;top:0;width:${vw}px;height:${vh}px;margin:0;transform:none;`;
 }
 scaleCanvas();
 window.addEventListener('resize',scaleCanvas);
