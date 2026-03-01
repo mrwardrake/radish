@@ -239,7 +239,26 @@ let playerName = localStorage.getItem('radShrimp_name') || '';
 let personalBest = parseInt(localStorage.getItem('radShrimp_pb') || '0');
 let fbReady = false;
 
-window.addEventListener('fbReady', () => { fbReady = true; });
+window.addEventListener('fbReady', () => {
+  fbReady = true;
+  if(playerName && window._db){
+    const pbRef=window._doc(window._db,'personal_bests',playerName);
+    window._getDoc(pbRef).then(snap=>{
+      const remotePB=snap.exists()?(snap.data().score||0):0;
+      if(remotePB>personalBest){
+        personalBest=remotePB;
+        localStorage.setItem('radShrimp_pb',remotePB);
+        const el=document.getElementById('pbVal');
+        if(el) el.textContent=personalBest.toLocaleString();
+      } else if(personalBest>remotePB&&personalBest>0){
+        // push local best up to Firestore
+        window._setDoc(pbRef,{name:playerName,score:personalBest,level:0,
+          dateStr:'Before leaderboard',timestamp:window._serverTimestamp()
+        }).catch(()=>{});
+      }
+    }).catch(()=>{});
+  }
+});
 
 // ── Show / hide screens ──
 function showNameScreen(onConfirm) {
@@ -506,6 +525,35 @@ function sfxFire(type){
     og.gain.setValueAtTime(.18,t); og.gain.exponentialRampToValueAtTime(.001,t+.06);
     o.connect(og); og.connect(sfGain); o.start(t); o.stop(t+.07);
   }
+}
+function sfxLaserRingActivate(){
+  if(!AC||muted) return;
+  const t=AC.currentTime;
+  // Rising power chord — energy shield powering up
+  [220,440,660,880].forEach((freq,i)=>{
+    const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();
+    f.type='bandpass'; f.frequency.value=freq*1.5; f.Q.value=3;
+    o.type='sawtooth'; o.frequency.setValueAtTime(freq*0.5,t+i*.07);
+    o.frequency.linearRampToValueAtTime(freq*2,t+i*.07+.35);
+    g.gain.setValueAtTime(0,t+i*.07);
+    g.gain.linearRampToValueAtTime(.12,t+i*.07+.08);
+    g.gain.exponentialRampToValueAtTime(.001,t+i*.07+.5);
+    o.connect(f); f.connect(g); g.connect(sfGain); o.start(t+i*.07); o.stop(t+i*.07+.55);
+  });
+  // High shimmer on top
+  const os=AC.createOscillator(),gs=AC.createGain();
+  os.type='sine'; os.frequency.setValueAtTime(2400,t); os.frequency.linearRampToValueAtTime(4800,t+.6);
+  gs.gain.setValueAtTime(.08,t); gs.gain.exponentialRampToValueAtTime(.001,t+.7);
+  os.connect(gs); gs.connect(sfGain); os.start(t); os.stop(t+.75);
+}
+function sfxLaserRingHum(){
+  if(!AC||muted) return;
+  const t=AC.currentTime;
+  const o=AC.createOscillator(),g=AC.createGain(),f=AC.createBiquadFilter();
+  f.type='bandpass'; f.frequency.value=1800; f.Q.value=6;
+  o.type='sawtooth'; o.frequency.setValueAtTime(340,t); o.frequency.linearRampToValueAtTime(480,t+.18);
+  g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.001,t+.22);
+  o.connect(f); f.connect(g); g.connect(sfGain); o.start(t); o.stop(t+.25);
 }
 function sfxBoom(big){
   if(!AC||muted) return;
@@ -902,7 +950,7 @@ function collectPU(pu){
     case 'homing_rocket': S.weapon='homing_rocket'; break;
     case 'multi_rocket':  S.weapon='multi_rocket';  break;
     case 'multi_laser':   S.weapon='multi_laser';   break;
-    case 'laser_ring':    S.laserRingActive=true; S.laserRingTimer=360; S.laserRingAngle=0; return; // timed passive — don't change weapon
+    case 'laser_ring':    S.laserRingActive=true; S.laserRingTimer=360; S.laserRingAngle=0; sfxLaserRingActivate(); return;
     case 'mega_bomb':     S.weapon='mega_bomb';     break;
     case 'omni_homing':   S.weapon='omni_homing';   break;
     case 'hydra':         S.weapon='hydra';         break;
@@ -962,6 +1010,8 @@ function update(){
     S.laserRingTimer--;
     if(S.laserRingTimer<=0){ S.laserRingActive=false; }
     S.laserRingAngle+=0.04;
+    // Periodic electric hum
+    if(S.time%30===0) sfxLaserRingHum();
     const cx2=sub.x+sub.w/2, cy2=sub.y+sub.h/2;
     const ARC_R=80;   // radius of the spinning arcs
     const DAMAGE_R=95; // damage zone — slightly larger than visual
@@ -2314,6 +2364,7 @@ function draw(){
   for(const pu of S.powerups) drawPowerup(pu);
   for(const m of S.mines) drawMine(m);
   for(const e of S.enemies) drawShrimp(e);
+  if(S.laserRingActive) drawLaserRing();
   if(S.laserOn) drawLaser();
   for(const b of S.bullets) drawBullet(b);
   drawSub();
