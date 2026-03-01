@@ -44,8 +44,8 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html{height:100%;overflow:hidden;}
 
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100vh;min-height:100dvh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
-#gc{position:relative;width:820px;height:620px;transform-origin:center center;}
+body{background:#000;margin:0;padding:0;width:100vw;height:100vh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
+#gc{position:fixed;top:0;left:0;width:820px;height:620px;transform-origin:top left;}
 canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rgba(0,120,255,0.35),0 0 100px rgba(0,40,180,0.25);}
 #ui{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 12px;pointer-events:none;z-index:10;gap:6px;}
 .ub{background:rgba(0,4,18,0.85);border:1px solid rgba(0,180,255,0.35);padding:7px 11px;border-radius:5px;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;min-width:105px;backdrop-filter:blur(6px);}
@@ -625,57 +625,25 @@ canvas.addEventListener('mouseup',()=>{keys['Space']=false;});
 
 // ── CANVAS SCALING — fits any screen ──
 function scaleCanvas(){
-  const gc=document.getElementById('gc');
-  const vw=window.innerWidth, vh=window.innerHeight;
-  const isMobile=vw<=900;
-  // On desktop (large screen), don't scale at all — just let flexbox center
-  if(!isMobile){
-    gc.style.transform='';
-    gc.style.margin='';
-    return;
-  }
-  const padBottom=164;
-  const scale=Math.min(vw/820,(vh-padBottom)/620);
-  gc.style.transform=`scale(${scale})`;
-  // Negative margins cancel the phantom layout space CSS transform leaves
-  const shrinkW=(820-820*scale)/2;
-  const shrinkH=(620-620*scale)/2;
-  gc.style.margin=`${-shrinkH}px ${-shrinkW}px`;
+  const gc = document.getElementById('gc');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // Always scale to fill the full screen
+  const scaleX = vw / 820;
+  const scaleY = vh / 620;
+  const scale = Math.min(scaleX, scaleY);
+  const scaledW = 820 * scale;
+  const scaledH = 620 * scale;
+  const left = (vw - scaledW) / 2;
+  const top = (vh - scaledH) / 2;
+  gc.style.transform = `scale(${scale})`;
+  gc.style.left = left + 'px';
+  gc.style.top = top + 'px';
 }
 scaleCanvas();
-window.addEventListener('resize',scaleCanvas);
-window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,200));
-
-// ── ANALOG JOYSTICK ──
-(function(){
-  const jc=document.getElementById('joystickCanvas');
-  if(!jc) return;
-  const jx=jc.getContext('2d');
-  const SIZE=150, CX=75, CY=75, BASE_R=58, KNOB_R=26, DEAD=0.08;
-  let active=false, knobX=CX, knobY=CY, touchId=null;
-
-  function drawJoystick(){
-    jx.clearRect(0,0,SIZE,SIZE);
-    // ── BASE RING ──
-    const bg=jx.createRadialGradient(CX,CY,BASE_R*0.3,CX,CY,BASE_R);
-    bg.addColorStop(0,'rgba(0,60,100,0.5)');
-    bg.addColorStop(1,'rgba(0,30,60,0.25)');
-    jx.beginPath(); jx.arc(CX,CY,BASE_R,0,Math.PI*2);
-    jx.fillStyle=bg; jx.fill();
-    jx.strokeStyle='rgba(0,180,255,0.45)'; jx.lineWidth=2.5; jx.stroke();
-    // Inner ring
-    jx.beginPath(); jx.arc(CX,CY,BASE_R*0.55,0,Math.PI*2);
-    jx.strokeStyle='rgba(0,150,220,0.2)'; jx.lineWidth=1; jx.stroke();
-    // Crosshair lines
-    jx.strokeStyle='rgba(0,160,220,0.18)'; jx.lineWidth=1;
-    jx.beginPath(); jx.moveTo(CX-BASE_R,CY); jx.lineTo(CX+BASE_R,CY); jx.stroke();
-    jx.beginPath(); jx.moveTo(CX,CY-BASE_R); jx.lineTo(CX,CY+BASE_R); jx.stroke();
-    // Direction nubs
-    const nubCol=active?'rgba(0,220,255,0.5)':'rgba(0,160,200,0.25)';
-    [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{
-      jx.beginPath(); jx.arc(CX+dx*(BASE_R-8),CY+dy*(BASE_R-8),4,0,Math.PI*2);
-      jx.fillStyle=nubCol; jx.fill();
-    });
+window.addEventListener('resize', scaleCanvas);
+window.addEventListener('orientationchange', () => setTimeout(scaleCanvas, 300));
+if(window.visualViewport){ window.visualViewport.addEventListener('resize', scaleCanvas); };
 
     // ── KNOB ──
     const kDx=knobX-CX, kDy=knobY-CY;

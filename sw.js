@@ -1,7 +1,10 @@
-const CACHE = 'rad-shrimp-v1';
+const CACHE = 'rad-shrimp-v9';
 const ASSETS = [
-  './radioactive-shrimp.html',
-  './manifest.json'
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', e => {
