@@ -4,7 +4,7 @@
 <link rel="manifest" href="manifest.json">
 <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Radioactive Shrimp">
@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>RADIOACTIVE SHRIMP</title>
 <script type="module">
- import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, getDoc, setDoc, serverTimestamp }
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -28,7 +28,6 @@
   appId: "1:364663379757:web:ffcbf1cdeeffa7c7f8a5a4",
   measurementId: "G-73X4THKBPV"
 };
-
   // ─────────────────────────────────────
 
   const app = initializeApp(firebaseConfig);
@@ -43,7 +42,9 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
+html{height:100%;overflow:hidden;}
+
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100vh;min-height:100dvh;overflow:hidden;font-family:'Share Tech Mono',monospace;color:#0ff;touch-action:none;}
 #gc{position:relative;width:820px;height:620px;transform-origin:center center;}
 canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rgba(0,120,255,0.35),0 0 100px rgba(0,40,180,0.25);}
 #ui{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px 12px;pointer-events:none;z-index:10;gap:6px;}
@@ -111,7 +112,7 @@ canvas{display:block;border:2px solid rgba(0,180,255,0.6);box-shadow:0 0 50px rg
 #lbBtn{position:absolute;bottom:8px;left:10px;background:rgba(0,4,18,.75);border:1px solid rgba(0,180,255,.3);color:#0af;font-size:11px;font-family:'Orbitron',sans-serif;padding:4px 9px;cursor:pointer;border-radius:3px;z-index:30;}
 
 /* ── TOUCH CONTROLS ── */
-#touchControls{display:none;position:fixed;bottom:0;left:0;right:0;height:160px;z-index:40;pointer-events:none;user-select:none;}
+#touchControls{display:none;position:fixed;bottom:0;bottom:env(safe-area-inset-bottom,0);left:0;right:0;height:160px;z-index:40;pointer-events:none;user-select:none;}
 #joystickCanvas{position:absolute;bottom:10px;left:10px;pointer-events:all;touch-action:none;}
 #fireBtn{position:absolute;bottom:24px;right:24px;width:96px;height:96px;border-radius:50%;
   background:radial-gradient(circle at 40% 35%,rgba(255,100,100,0.35),rgba(180,0,0,0.25));
@@ -650,7 +651,7 @@ window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,200));
   const jc=document.getElementById('joystickCanvas');
   if(!jc) return;
   const jx=jc.getContext('2d');
-  const SIZE=150, CX=75, CY=75, BASE_R=58, KNOB_R=26, DEAD=0.18;
+  const SIZE=150, CX=75, CY=75, BASE_R=58, KNOB_R=26, DEAD=0.08;
   let active=false, knobX=CX, knobY=CY, touchId=null;
 
   function drawJoystick(){
@@ -706,6 +707,10 @@ window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,200));
 
   function updateKeys(nx,ny){
     const dx=(nx-CX)/BASE_R, dy=(ny-CY)/BASE_R;
+    // Store analog axis values — movement code reads these for speed scaling
+    keys._joyX = Math.abs(dx) > DEAD ? dx : 0;
+    keys._joyY = Math.abs(dy) > DEAD ? dy : 0;
+    // Also keep boolean keys for keyboard compat
     keys['ArrowLeft'] = dx < -DEAD;
     keys['ArrowRight']= dx >  DEAD;
     keys['ArrowUp']   = dy < -DEAD;
@@ -714,6 +719,7 @@ window.addEventListener('orientationchange',()=>setTimeout(scaleCanvas,200));
 
   function clearKeys(){
     keys['ArrowLeft']=keys['ArrowRight']=keys['ArrowUp']=keys['ArrowDown']=false;
+    keys._joyX=0; keys._joyY=0;
   }
 
   function onStart(e){
@@ -1085,10 +1091,16 @@ function update(){
 
   // Sub movement
   let dx=0,dy=0;
-  if(keys['ArrowLeft']||keys['KeyA']) dx-=sub.spd;
-  if(keys['ArrowRight']||keys['KeyD']) dx+=sub.spd;
-  if(keys['ArrowUp']||keys['KeyW']) dy-=sub.spd;
-  if(keys['ArrowDown']||keys['KeyS']) dy+=sub.spd;
+  // Analog joystick — scale speed by how far stick is pushed
+  if(keys._joyX||keys._joyY){
+    dx+=keys._joyX*sub.spd;
+    dy+=keys._joyY*sub.spd;
+  } else {
+    if(keys['ArrowLeft']||keys['KeyA']) dx-=sub.spd;
+    if(keys['ArrowRight']||keys['KeyD']) dx+=sub.spd;
+    if(keys['ArrowUp']||keys['KeyW']) dy-=sub.spd;
+    if(keys['ArrowDown']||keys['KeyS']) dy+=sub.spd;
+  }
   sub.vx+=(dx-sub.vx)*.19; sub.vy+=(dy-sub.vy)*.19;
   sub.x=clamp(sub.x+sub.vx,0,W-sub.w);
   sub.y=clamp(sub.y+sub.vy,0,H-sub.h);
